@@ -205,7 +205,18 @@ def test_full_pipeline_synthetic():
     assert pipeline._frame_idx == 2
     traj = pipeline.get_trajectory()
     assert traj.shape == (2, 3)
-    print(f"OK  (final pos=[{t1.ravel()}])")
+
+    # With the corrected logic, the translation should be roughly [-0.5, 0, 0]
+    # for a camera move of +0.5 along X (relative to world).
+    # Since Monocular VO has no scale, we check the normalized direction.
+    t_est = traj[1] - traj[0]
+    t_est_unit = t_est / np.linalg.norm(t_est)
+    t_true_unit = np.array([-1.0, 0.0, 0.0]) # world-frame translation is -R_rel^T * t_rel
+
+    cos_sim = np.dot(t_est_unit, t_true_unit)
+    assert cos_sim > 0.9, f"Translation direction incorrect: {t_est_unit} (cos_sim={cos_sim:.2f})"
+
+    print(f"OK  (final pos={t1.ravel()}, cos_sim={cos_sim:.2f})")
 
 
 def test_metrics_ate():

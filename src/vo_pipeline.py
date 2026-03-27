@@ -429,9 +429,13 @@ class MonocularVOPipeline:
             t = t / t_norm  # unit translation
 
         # Stage 7: Accumulate global pose
-        # t_global_new = t_global + R_global @ t_relative
-        self._t_global = self._t_global + self._R_global @ t
-        self._R_global = R @ self._R_global
+        # recoverPose returns (R, t) such that x_curr = R*x_prev + t
+        # For world-frame tracking: x_prev = R^T * x_curr - R^T * t
+        R_rel = R.T
+        t_rel = -R.T @ t
+
+        self._t_global = self._t_global + self._R_global @ t_rel
+        self._R_global = self._R_global @ R_rel
 
         self.trajectory.append(self._t_global.ravel().copy())
 

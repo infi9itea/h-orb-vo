@@ -26,14 +26,32 @@ class KITTISequence:
         self.seq = seq
         self.cam = cam
 
-        img_dir = self.root / "sequences" / seq / f"image_{cam}"
-        self.image_paths = sorted(img_dir.glob("*.png"))
+        # Try specified camera first, then fall back to others if needed
+        img_dir = self.root / "sequences" / seq / f"image_{self.cam}"
+        self.image_paths = self._find_images(img_dir)
+
         if not self.image_paths:
-            self.image_paths = sorted(img_dir.glob("*.jpg"))
-        assert self.image_paths, f"No images found in {img_dir}"
+            # Common camera indices: 0, 1 (grayscale), 2, 3 (color)
+            for fallback_cam in [0, 1, 2, 3]:
+                if fallback_cam == self.cam:
+                    continue
+                img_dir = self.root / "sequences" / seq / f"image_{fallback_cam}"
+                self.image_paths = self._find_images(img_dir)
+                if self.image_paths:
+                    print(f"[KITTI] Camera {self.cam} not found, falling back to camera {fallback_cam}")
+                    self.cam = fallback_cam
+                    break
+
+        assert self.image_paths, f"No images found for sequence {seq} in {self.root / 'sequences' / seq}"
 
         self.K = self._load_K()
         self.gt_poses = self._load_gt()  # list of (4,4) or None
+
+    def _find_images(self, img_dir: Path) -> list:
+        paths = sorted(img_dir.glob("*.png"))
+        if not paths:
+            paths = sorted(img_dir.glob("*.jpg"))
+        return paths
 
     def _load_K(self) -> np.ndarray:
         calib_path = self.root / "sequences" / self.seq / "calib.txt"

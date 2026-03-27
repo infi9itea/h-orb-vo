@@ -128,7 +128,7 @@ def run_synthetic_test():
         ax.set_xlabel("X (m)"); ax.set_ylabel("Z (m)")
         ax.legend(); ax.grid(True, alpha=0.3)
         plt.tight_layout()
-        out = "/mnt/user-data/outputs/synthetic_trajectory.png"
+        out = "synthetic_trajectory.png"
         plt.savefig(out, dpi=150)
         print(f"Plot saved → {out}")
     except Exception as e:

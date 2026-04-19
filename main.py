@@ -196,7 +196,28 @@ def run_synthetic_test(out_dir="."):
     rpe = compute_rpe(Rs_est, ts_est, [np.eye(3)]*n, [p.reshape(3,1) for p in gt_arr])
     print_metrics(ate, rpe, seq="Synthetic")
 
+<<<<<<< HEAD
     _save_all_diagnostics(vo, traj, "synthetic", gt_positions, frames_data[:2], out_dir)
+=======
+    # Plot (X-Z plane = X vs forward-Z, but our test uses X translation)
+    try:
+        import matplotlib
+        matplotlib.use("Agg")
+        import matplotlib.pyplot as plt
+        fig, ax = plt.subplots(figsize=(10, 5))
+        ax.plot(est_pos[:, 0], est_pos[:, 2], "b-", label="Estimated")
+        ax.plot(gt_arr[:, 0], gt_arr[:, 2], "r--", label="Ground Truth")
+        ax.set_title("Synthetic Test: Trajectory (X-Z)")
+        ax.set_xlabel("X (m)"); ax.set_ylabel("Z (m)")
+        ax.legend(); ax.grid(True, alpha=0.3)
+        plt.tight_layout()
+        out = "synthetic_trajectory.png"
+        plt.savefig(out, dpi=150)
+        print(f"Plot saved → {out}")
+    except Exception as e:
+        print(f"Plot failed: {e}")
+
+>>>>>>> cf40d902d9d07a6addfe7208beed3eaf070dea5a
     return ate, rpe
 
 

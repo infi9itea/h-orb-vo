@@ -4,7 +4,6 @@ Standard monocular VO evaluation metrics.
   - RPE  : Relative Pose Error        (translation and rotation, configurable delta)
 """
 import numpy as np
-from scipy.linalg import logm
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -91,6 +90,13 @@ def _rot_error_deg(R_err: np.ndarray) -> float:
     return float(np.degrees(np.arccos(val)))
 
 
+def _rel_pose(R_a, t_a, R_b, t_b):
+    """Relative transform from frame-a to frame-b."""
+    R_rel = R_b.T @ R_a
+    t_rel = R_b.T @ (t_a - t_b)
+    return R_rel, t_rel
+
+
 def compute_rpe(
     est_Rs: list,
     est_ts: list,
@@ -117,20 +123,8 @@ def compute_rpe(
     for i in range(n - delta):
         j = i + delta
 
-        # Relative ground-truth motion  (world frame, cam-in-world convention)
-        # T_rel_gt  = T_gt_j^{-1} * T_gt_i  in camera convention
-        # We store cam-in-world:  P_world = R_c2w @ P_cam + t_c2w
-        # world-to-cam:           R_w2c = R_c2w.T,  t_w2c = -R_c2w.T @ t_c2w
-
-        def rel_pose(R_a, t_a, R_b, t_b):
-            """Relative transform from frame-a to frame-b (world coords)."""
-            # T_rel = T_b^{-1} @ T_a
-            R_rel = R_b.T @ R_a
-            t_rel = R_b.T @ (t_a - t_b)
-            return R_rel, t_rel
-
-        R_gt_rel, t_gt_rel = rel_pose(gt_Rs[i], gt_ts[i], gt_Rs[j], gt_ts[j])
-        R_es_rel, t_es_rel = rel_pose(est_Rs[i], est_ts[i], est_Rs[j], est_ts[j])
+        R_gt_rel, t_gt_rel = _rel_pose(gt_Rs[i], gt_ts[i], gt_Rs[j], gt_ts[j])
+        R_es_rel, t_es_rel = _rel_pose(est_Rs[i], est_ts[i], est_Rs[j], est_ts[j])
 
         # Scale est translation to match gt (monocular only)
         gt_norm = np.linalg.norm(t_gt_rel)
@@ -146,6 +140,14 @@ def compute_rpe(
 
         trans_errs.append(t_err)
         rot_errs.append(r_err)
+
+    # BUG FIX: guard against empty arrays (n <= delta case)
+    if not trans_errs:
+        return {
+            "trans_rmse": 0.0, "trans_mean": 0.0, "trans_std": 0.0,
+            "rot_rmse": 0.0, "rot_mean": 0.0, "rot_std": 0.0,
+            "trans_errors": np.array([]), "rot_errors": np.array([]),
+        }
 
     trans_errs = np.array(trans_errs)
     rot_errs = np.array(rot_errs)

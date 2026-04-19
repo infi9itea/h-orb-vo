@@ -10,12 +10,12 @@ from typing import Optional
 
 @dataclass
 class TrackerConfig:
-    detector: str = "harris"          # "harris" | "fast"
+    detector: str = "harris"    
     harris_block_size: int = 2
     harris_ksize: int = 3
     harris_k: float = 0.04
-    harris_threshold: float = 0.01    # fraction of max response
-    harris_min_distance: int = 10     # minimum px distance between corners
+    harris_threshold: float = 0.01    
+    harris_min_distance: int = 10 
     fast_threshold: int = 20
     orb_n_features: int = 500
     orb_scale_factor: float = 1.2
@@ -24,7 +24,7 @@ class TrackerConfig:
     lk_win_size: tuple = (21, 21)
     lk_max_level: int = 3
     lk_criteria: tuple = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01)
-    min_tracked: int = 50             # re-detect if fewer tracks remain
+    min_tracked: int = 50    
 
 
 class FeatureTracker:
@@ -41,9 +41,6 @@ class FeatureTracker:
             nlevels=cfg.orb_n_levels,
         )
 
-    # ------------------------------------------------------------------
-    # Detection
-    # ------------------------------------------------------------------
     def detect(self, gray: np.ndarray) -> np.ndarray:
         """Return (N,2) float32 array of pixel coordinates."""
         if self.cfg.detector == "harris":
@@ -61,18 +58,13 @@ class FeatureTracker:
             self.cfg.harris_ksize,
             self.cfg.harris_k,
         )
-        # Dilate for NMS
         response = cv2.dilate(response, None)
         threshold = self.cfg.harris_threshold * response.max()
         mask = response > threshold
         ys, xs = np.where(mask)
         responses = response[ys, xs]
-
-        # Sort by response, keep top-N
         order = np.argsort(-responses)
         xs, ys = xs[order], ys[order]
-
-        # Greedy minimum-distance suppression
         kept = []
         occupied = np.zeros(gray.shape[:2], dtype=bool)
         d = self.cfg.harris_min_distance
@@ -100,9 +92,6 @@ class FeatureTracker:
         pts = np.array([[k.pt[0], k.pt[1]] for k in kps], dtype=np.float32)
         return pts
 
-    # ------------------------------------------------------------------
-    # ORB descriptors
-    # ------------------------------------------------------------------
     def describe(self, gray: np.ndarray, pts: np.ndarray):
         """Compute ORB descriptors for given points. Returns (kps, descs)."""
         if len(pts) == 0:
@@ -111,24 +100,13 @@ class FeatureTracker:
         kps, descs = self.orb.compute(gray, kps)
         return kps, descs
 
-    # ------------------------------------------------------------------
-    # Optical-flow tracking
-    # ------------------------------------------------------------------
     def track(
         self,
         gray_prev: np.ndarray,
         gray_curr: np.ndarray,
         pts_prev: np.ndarray,
     ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
-        """
-        Track pts_prev from gray_prev to gray_curr using LK optical flow.
 
-        Returns
-        -------
-        pts_prev_ok : (M,2) matched points in prev frame
-        pts_curr_ok : (M,2) matched points in curr frame
-        mask        : (N,) bool mask over input pts_prev
-        """
         if len(pts_prev) == 0:
             empty = np.empty((0, 2), dtype=np.float32)
             return empty, empty, np.zeros(0, dtype=bool)

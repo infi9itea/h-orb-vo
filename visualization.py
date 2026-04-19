@@ -1,14 +1,3 @@
-"""
-Visualization utilities for monocular VO.
-
-Produces all diagnostic outputs:
-  - trajectory_<seq>.png / .csv   — 2-D trajectory overlay
-  - error_<seq>.png               — per-frame position error
-  - harris_corners<N>.png         — detected Harris corners
-  - feature_matches_*.png         — matched feature lines between two frames
-  - inliers_<seq>.png             — RANSAC inliers per frame
-  - matches_<seq>.png             — feature matches per frame
-"""
 import cv2
 import numpy as np
 import matplotlib
@@ -18,12 +7,7 @@ import matplotlib.gridspec as gridspec
 from typing import Optional
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Feature-level visuals
-# ──────────────────────────────────────────────────────────────────────────────
-
 def draw_tracks(img, pts_prev, pts_curr, color=(0, 200, 0)):
-    """Draw optical flow tracks on an image."""
     vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) if img.ndim == 2 else img.copy()
     for p0, p1 in zip(pts_prev, pts_curr):
         cv2.line(vis, (int(p0[0]), int(p0[1])), (int(p1[0]), int(p1[1])), color, 1, cv2.LINE_AA)
@@ -32,10 +16,7 @@ def draw_tracks(img, pts_prev, pts_curr, color=(0, 200, 0)):
 
 
 def save_harris_corners(img, pts, save_path, radius=4, color=(0, 0, 255)):
-    """
-    Draw detected Harris corners on the image and save.
-    Matches the style in harris_corners.png: red dots on greyscale.
-    """
+
     vis = cv2.cvtColor(img, cv2.COLOR_GRAY2BGR) if img.ndim == 2 else img.copy()
     for p in pts:
         cv2.circle(vis, (int(p[0]), int(p[1])), radius, color, -1)
@@ -44,10 +25,7 @@ def save_harris_corners(img, pts, save_path, radius=4, color=(0, 0, 255)):
 
 
 def save_feature_matches(img1, img2, pts1, pts2, save_path, max_lines=40):
-    """
-    Draw coloured correspondence lines between two frames side-by-side.
-    Matches the style in feature_matches__2_distinct_.png.
-    """
+
     h1, w1 = img1.shape[:2]
     h2, w2 = img2.shape[:2]
     h = max(h1, h2)
@@ -76,11 +54,7 @@ def save_feature_matches(img1, img2, pts1, pts2, save_path, max_lines=40):
 # ──────────────────────────────────────────────────────────────────────────────
 
 def plot_trajectory_2d(est_pos, gt_pos=None, title="Trajectory", save_path=None):
-    """
-    Plot estimated vs GT trajectory (X-Z plane).
-    Matches trajectory_00.png / trajectory_07.png style:
-    GT = blue, Estimated = orange.
-    """
+
     fig, ax = plt.subplots(figsize=(8, 8))
     if gt_pos is not None:
         ax.plot(gt_pos[:, 0], gt_pos[:, 2], color="#1f77b4", lw=1.5, label="Ground Truth")
@@ -96,16 +70,11 @@ def plot_trajectory_2d(est_pos, gt_pos=None, title="Trajectory", save_path=None)
 
 
 def save_trajectory_csv(est_pos, save_path):
-    """Save estimated trajectory positions as CSV with x,y,z columns."""
     np.savetxt(save_path, est_pos, delimiter=",", header="x,y,z", comments="")
     print(f"Saved trajectory CSV -> {save_path}")
 
 
 def plot_error_per_frame(est_pos, gt_pos, title="Trajectory Error", save_path=None):
-    """
-    Plot per-frame Euclidean position error (raw, no Sim3 alignment).
-    Matches error_00.png / error_07.png style.
-    """
     n = min(len(est_pos), len(gt_pos))
     errors = np.linalg.norm(est_pos[:n] - gt_pos[:n], axis=1)
     fig, ax = plt.subplots(figsize=(6, 4))
@@ -121,10 +90,6 @@ def plot_error_per_frame(est_pos, gt_pos, title="Trajectory Error", save_path=No
 
 
 def plot_inliers_per_frame(inlier_counts, title="RANSAC Inliers per Frame", save_path=None):
-    """
-    Plot RANSAC inlier count per frame.
-    Matches inliers_00.png / inliers_07.png style.
-    """
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(inlier_counts, color="#1f77b4", lw=1.0)
     ax.set_title(title)
@@ -138,10 +103,6 @@ def plot_inliers_per_frame(inlier_counts, title="RANSAC Inliers per Frame", save
 
 
 def plot_matches_per_frame(match_counts, title="Feature Matches per Frame", save_path=None):
-    """
-    Plot tracked feature match count per frame.
-    Matches matches_00.png / matches_07.png style.
-    """
     fig, ax = plt.subplots(figsize=(6, 4))
     ax.plot(match_counts, color="#1f77b4", lw=1.0)
     ax.set_title(title)
@@ -155,7 +116,6 @@ def plot_matches_per_frame(match_counts, title="Feature Matches per Frame", save
 
 
 def plot_ate_rpe(ate_dict, rpe_dict, save_path=None):
-    """Summary plot: ATE error over frames + RPE distribution."""
     fig = plt.figure(figsize=(14, 5))
     gs = gridspec.GridSpec(1, 2, figure=fig)
 

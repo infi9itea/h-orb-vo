@@ -1,14 +1,5 @@
-"""
-Standard monocular VO evaluation metrics.
-  - ATE  : Absolute Trajectory Error  (RMSE of position after Sim(3) alignment)
-  - RPE  : Relative Pose Error        (translation and rotation, configurable delta)
-"""
 import numpy as np
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# Helpers
-# ──────────────────────────────────────────────────────────────────────────────
 
 def _umeyama(src: np.ndarray, dst: np.ndarray, with_scale: bool = True):
     """
@@ -38,28 +29,13 @@ def _umeyama(src: np.ndarray, dst: np.ndarray, with_scale: bool = True):
     return s, R, t
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# ATE
-# ──────────────────────────────────────────────────────────────────────────────
 
 def compute_ate(
     est: np.ndarray,
     gt: np.ndarray,
     align: bool = True,
 ) -> dict:
-    """
-    Absolute Trajectory Error (position RMSE after Sim(3) alignment).
 
-    Parameters
-    ----------
-    est : (N, 3)  estimated positions
-    gt  : (N, 3)  ground-truth positions
-    align : whether to perform Sim(3) alignment (True for monocular)
-
-    Returns
-    -------
-    dict with keys: rmse, mean, std, max, min  (all in metres)
-    """
     assert len(est) == len(gt), "est and gt must have same length"
     if align:
         s, R, t = _umeyama(est, gt)
@@ -84,14 +60,12 @@ def compute_ate(
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _rot_error_deg(R_err: np.ndarray) -> float:
-    """Rotation angle of a rotation matrix (degrees)."""
     val = (np.trace(R_err) - 1.0) / 2.0
     val = np.clip(val, -1.0, 1.0)
     return float(np.degrees(np.arccos(val)))
 
 
 def _rel_pose(R_a, t_a, R_b, t_b):
-    """Relative transform from frame-a to frame-b."""
     R_rel = R_b.T @ R_a
     t_rel = R_b.T @ (t_a - t_b)
     return R_rel, t_rel
@@ -104,19 +78,6 @@ def compute_rpe(
     gt_ts: list,
     delta: int = 1,
 ) -> dict:
-    """
-    Relative Pose Error at stride `delta`.
-
-    Parameters
-    ----------
-    est_Rs, est_ts : lists of (3,3) and (3,1) cam-in-world poses
-    gt_Rs,  gt_ts  : same for ground truth
-    delta          : frame stride for relative motion (default 1 = consecutive)
-
-    Returns
-    -------
-    dict with trans_rmse (m), trans_mean, rot_mean (deg), rot_rmse (deg)
-    """
     n = len(est_Rs)
     trans_errs, rot_errs = [], []
 

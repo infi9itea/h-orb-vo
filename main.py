@@ -1,27 +1,3 @@
-"""
-Main entry point for the monocular VO pipeline.
-
-Usage
------
-# Run synthetic smoke-test:
-python main.py --test
-
-# Run on KITTI:
-python main.py --dataset kitti --root /path/to/kitti --seq 00 --max-frames 500
-
-# Run on EuRoC:
-python main.py --dataset euroc --root /path/to/MH_01_easy
-
-Outputs produced (all saved to --out-dir, default = current directory):
-  trajectory_<seq>.png     — 2-D trajectory overlay (GT vs estimated)
-  trajectory_<seq>.csv     — estimated positions as x,y,z CSV
-  error_<seq>.png          — per-frame position error
-  inliers_<seq>.png        — RANSAC inlier count per frame
-  matches_<seq>.png        — tracked feature count per frame
-  harris_corners.png       — Harris corners on first frame
-  harris_corners1.png      — Harris corners on second frame
-  feature_matches_<seq>.png — coloured correspondence lines between frames 0 & 1
-"""
 import sys
 import os
 import argparse
@@ -43,10 +19,6 @@ from visualization import (
 )
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Shared diagnostics saver
-# ──────────────────────────────────────────────────────────────────────────────
-
 def _save_all_diagnostics(vo, traj, seq, gt_positions_list, ds_frames, out_dir):
     """
     Save every diagnostic output after a run.
@@ -65,7 +37,6 @@ def _save_all_diagnostics(vo, traj, seq, gt_positions_list, ds_frames, out_dir):
     est_pos = traj.estimated_positions()
     gt_arr  = traj.gt_positions_array()
 
-    # ── Trajectory PNG + CSV ─────────────────────────────────────────────
     plot_trajectory_2d(
         est_pos, gt_arr,
         title=f"Trajectory Sequence {seq}",
@@ -73,7 +44,6 @@ def _save_all_diagnostics(vo, traj, seq, gt_positions_list, ds_frames, out_dir):
     )
     save_trajectory_csv(est_pos, os.path.join(out_dir, f"trajectory_{seq}.csv"))
 
-    # ── Per-frame error ──────────────────────────────────────────────────
     if gt_arr is not None:
         n = min(len(est_pos), len(gt_arr))
         plot_error_per_frame(
@@ -82,7 +52,6 @@ def _save_all_diagnostics(vo, traj, seq, gt_positions_list, ds_frames, out_dir):
             save_path=os.path.join(out_dir, f"error_{seq}.png"),
         )
 
-    # ── Inliers + Matches per frame ──────────────────────────────────────
     if vo.inlier_counts:
         plot_inliers_per_frame(
             vo.inlier_counts,
@@ -96,7 +65,6 @@ def _save_all_diagnostics(vo, traj, seq, gt_positions_list, ds_frames, out_dir):
             save_path=os.path.join(out_dir, f"matches_{seq}.png"),
         )
 
-    # ── Harris corners on frames 0 & 1 ──────────────────────────────────
     if ds_frames and len(ds_frames) >= 1:
         tracker = vo.tracker
         img0 = ds_frames[0][0]
@@ -115,7 +83,6 @@ def _save_all_diagnostics(vo, traj, seq, gt_positions_list, ds_frames, out_dir):
                 save_path=os.path.join(out_dir, "harris_corners1.png"),
             )
 
-    # ── Feature match lines (frame 0 → frame 1) ─────────────────────────
     if ds_frames and len(ds_frames) >= 2:
         img0 = ds_frames[0][0]
         img1 = ds_frames[1][0]
@@ -131,9 +98,6 @@ def _save_all_diagnostics(vo, traj, seq, gt_positions_list, ds_frames, out_dir):
     print(f"\nAll outputs saved to: {out_dir}/")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Synthetic smoke-test
-# ──────────────────────────────────────────────────────────────────────────────
 
 def _render_scene(R_cw, t_cw, K, pts3d, img_size=(640, 480)):
     h, w = img_size[1], img_size[0]
@@ -200,9 +164,6 @@ def run_synthetic_test(out_dir="."):
     return ate, rpe
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# KITTI runner
-# ──────────────────────────────────────────────────────────────────────────────
 
 def run_kitti(root, seq, detector="harris", max_frames=None, out_dir="."):
     from datasets import KITTISequence
@@ -214,7 +175,6 @@ def run_kitti(root, seq, detector="harris", max_frames=None, out_dir="."):
     cfg.tracker.detector = detector
     vo = MonocularVO(ds.K, cfg)
 
-    # Collect first 2 raw frames for corner/match visuals
     frames_iter = iter(ds)
     first_frames = []
     for i, item in enumerate(ds):
@@ -242,10 +202,6 @@ def run_kitti(root, seq, detector="harris", max_frames=None, out_dir="."):
     _save_all_diagnostics(vo, traj, seq, None, first_frames, out_dir)
     return ate, rpe, traj
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# EuRoC runner
-# ──────────────────────────────────────────────────────────────────────────────
 
 def run_euroc(root, detector="harris", max_frames=None, out_dir="."):
     from datasets import EuRoCSequence
@@ -277,10 +233,6 @@ def run_euroc(root, detector="harris", max_frames=None, out_dir="."):
     _save_all_diagnostics(vo, traj, "euroc", None, first_frames, out_dir)
     return ate, rpe, traj
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# CLI
-# ──────────────────────────────────────────────────────────────────────────────
 
 def main():
     parser = argparse.ArgumentParser(description="Monocular VO Pipeline")

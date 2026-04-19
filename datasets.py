@@ -1,7 +1,3 @@
-"""
-Dataset loaders for KITTI (odometry) and EuRoC MAV.
-Both yield (image_path, K, gt_pose_or_None) tuples.
-"""
 import os
 import cv2
 import numpy as np
@@ -14,12 +10,6 @@ from typing import Iterator, Optional
 # ──────────────────────────────────────────────────────────────────────────────
 
 class KITTISequence:
-    """
-    Directory layout expected:
-        <root>/sequences/<seq>/image_0/*.png
-        <root>/sequences/<seq>/calib.txt
-        <root>/poses/<seq>.txt             (optional, for GT)
-    """
 
     def __init__(self, root: str, seq: str, cam: int = 0):
         self.root = Path(root)
@@ -91,10 +81,6 @@ class KITTISequence:
         return self.gt_poses[idx][:3, 3]
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# EuRoC MAV
-# ──────────────────────────────────────────────────────────────────────────────
-
 class EuRoCSequence:
     """
     Directory layout expected (ASL dataset format):
@@ -138,7 +124,7 @@ class EuRoCSequence:
             return None
         gt = {}
         with open(gt_csv) as f:
-            next(f)  # header
+            next(f) 
             for line in f:
                 vals = line.strip().split(",")
                 ts = int(vals[0])

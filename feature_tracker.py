@@ -1,7 +1,3 @@
-"""
-Feature detection and tracking module.
-Supports Harris+ORB and FAST+ORB detector combinations.
-"""
 import cv2
 import numpy as np
 from dataclasses import dataclass

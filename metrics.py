@@ -2,11 +2,7 @@ import numpy as np
 
 
 def _umeyama(src: np.ndarray, dst: np.ndarray, with_scale: bool = True):
-    """
-    Least-squares Sim(3) alignment of src → dst.
-    src, dst : (N, 3)
-    Returns s, R, t  such that  dst ≈ s * R @ src.T + t
-    """
+
     assert src.shape == dst.shape and src.ndim == 2 and src.shape[1] == 3
     n = src.shape[0]
     mu_src = src.mean(0)

@@ -20,18 +20,7 @@ from visualization import (
 
 
 def _save_all_diagnostics(vo, traj, seq, gt_positions_list, ds_frames, out_dir):
-    """
-    Save every diagnostic output after a run.
 
-    Parameters
-    ----------
-    vo               : MonocularVO instance (has .inlier_counts, .match_counts)
-    traj             : Trajectory instance
-    seq              : string label e.g. "00" or "synthetic"
-    gt_positions_list: list of (3,) arrays or None
-    ds_frames        : list of raw (img, K, gt) tuples for the first 2 frames
-    out_dir          : output directory path
-    """
     os.makedirs(out_dir, exist_ok=True)
 
     est_pos = traj.estimated_positions()

@@ -4,11 +4,6 @@ import numpy as np
 from pathlib import Path
 from typing import Iterator, Optional
 
-
-# ──────────────────────────────────────────────────────────────────────────────
-# KITTI Odometry
-# ──────────────────────────────────────────────────────────────────────────────
-
 class KITTISequence:
 
     def __init__(self, root: str, seq: str, cam: int = 0):
@@ -82,12 +77,6 @@ class KITTISequence:
 
 
 class EuRoCSequence:
-    """
-    Directory layout expected (ASL dataset format):
-        <root>/cam0/data/*.png
-        <root>/cam0/sensor.yaml
-        <root>/state_groundtruth_estimate0/data.csv   (optional GT)
-    """
 
     def __init__(self, root: str, cam: str = "cam0"):
         self.root = Path(root)
@@ -101,7 +90,6 @@ class EuRoCSequence:
         self.gt_poses = self._load_gt()  # dict ts -> (3,) position or None
 
     def _load_calib(self):
-        """Parse sensor.yaml for intrinsics."""
         yaml_path = self.root / self.cam / "sensor.yaml"
         K = np.eye(3)
         dist = np.zeros(4)

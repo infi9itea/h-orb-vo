@@ -28,10 +28,6 @@ class TrackerConfig:
 
 
 class FeatureTracker:
-    """
-    Detect keypoints with Harris or FAST, describe with ORB,
-    then track frame-to-frame with Lucas-Kanade optical flow.
-    """
 
     def __init__(self, cfg: TrackerConfig = TrackerConfig()):
         self.cfg = cfg
@@ -42,7 +38,6 @@ class FeatureTracker:
         )
 
     def detect(self, gray: np.ndarray) -> np.ndarray:
-        """Return (N,2) float32 array of pixel coordinates."""
         if self.cfg.detector == "harris":
             return self._detect_harris(gray)
         elif self.cfg.detector == "fast":
@@ -93,7 +88,7 @@ class FeatureTracker:
         return pts
 
     def describe(self, gray: np.ndarray, pts: np.ndarray):
-        """Compute ORB descriptors for given points. Returns (kps, descs)."""
+        
         if len(pts) == 0:
             return [], None
         kps = [cv2.KeyPoint(float(p[0]), float(p[1]), 7) for p in pts]

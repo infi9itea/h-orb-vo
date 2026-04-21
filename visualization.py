@@ -49,19 +49,18 @@ def save_feature_matches(img1, img2, pts1, pts2, save_path, max_lines=40):
     print(f"Saved feature matches -> {save_path}")
 
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Per-run diagnostic plots
-# ──────────────────────────────────────────────────────────────────────────────
-
 def plot_trajectory_2d(est_pos, gt_pos=None, title="Trajectory", save_path=None):
 
     fig, ax = plt.subplots(figsize=(8, 8))
+    est_x = -est_pos[:, 0]
+    est_z = est_pos[:, 2]
     if gt_pos is not None:
         ax.plot(gt_pos[:, 0], gt_pos[:, 2], color="#1f77b4", lw=1.5, label="Ground Truth")
     ax.plot(est_pos[:, 0], est_pos[:, 2], color="#ff7f0e", lw=1.5, label="Estimated")
     ax.set_title(title)
     ax.set_xlabel("X (m)"); ax.set_ylabel("Z (m)")
     ax.legend(loc="upper right"); ax.grid(True, alpha=0.3)
+    ax.set_aspect('equal')
     plt.tight_layout()
     if save_path:
         plt.savefig(save_path, dpi=150)

@@ -104,7 +104,7 @@ class MonocularVO:
             scale = 1.0
 
         self._t = self._t + scale * (self._R @ t_rel)
-        self._R = self._R @ R_rel.T
+        self._R = R_rel @ self._R           
 
         # Re-detect on inlier set
         inlier_flat = inlier_mask.ravel().astype(bool)
@@ -130,7 +130,6 @@ class MonocularVO:
                   f"inliers={n_inliers}/{n_tracked}, scale={scale:.3f}")
 
         return stat
-
 
     def run(self, dataset_iter: Iterator, max_frames: int = None) -> Trajectory:
         for i, (img, K, gt_pose) in enumerate(dataset_iter):

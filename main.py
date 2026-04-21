@@ -87,7 +87,6 @@ def _save_all_diagnostics(vo, traj, seq, gt_positions_list, ds_frames, out_dir):
     print(f"\nAll outputs saved to: {out_dir}/")
 
 
-
 def _render_scene(R_cw, t_cw, K, pts3d, img_size=(640, 480)):
     h, w = img_size[1], img_size[0]
     img = np.zeros((h, w), dtype=np.uint8)
@@ -153,7 +152,6 @@ def run_synthetic_test(out_dir="."):
     return ate, rpe
 
 
-
 def run_kitti(root, seq, detector="harris", max_frames=None, out_dir="."):
     from datasets import KITTISequence
     print(f"\nLoading KITTI seq {seq} from {root} ...")
@@ -164,11 +162,7 @@ def run_kitti(root, seq, detector="harris", max_frames=None, out_dir="."):
     cfg.tracker.detector = detector
     vo = MonocularVO(ds.K, cfg)
 
-    frames_iter = iter(ds)
-    first_frames = []
-    for i, item in enumerate(ds):
-        if i < 2:
-            first_frames.append(item)
+    first_frames = [item for i, item in enumerate(ds) if i < 2]
 
     vo.run(iter(ds), max_frames=max_frames)
     traj = vo.trajectory
@@ -192,41 +186,9 @@ def run_kitti(root, seq, detector="harris", max_frames=None, out_dir="."):
     return ate, rpe, traj
 
 
-def run_euroc(root, detector="harris", max_frames=None, out_dir="."):
-    from datasets import EuRoCSequence
-    print(f"\nLoading EuRoC from {root} ...")
-    ds = EuRoCSequence(root)
-    print(f"  {len(ds)} frames")
-
-    cfg = VOConfig(verbose=True)
-    cfg.tracker.detector = detector
-    vo = MonocularVO(ds.K, cfg)
-
-    first_frames = [item for i, item in enumerate(ds) if i < 2]
-    vo.run(iter(ds), max_frames=max_frames)
-    traj  = vo.trajectory
-    est_pos = traj.estimated_positions()
-    gt_pos  = traj.gt_positions_array()
-
-    ate, rpe = None, None
-    if gt_pos is not None:
-        n = min(len(est_pos), len(gt_pos))
-        ate = compute_ate(est_pos[:n], gt_pos[:n])
-        Rs_est = [f.R for f in traj.frames[:n]]
-        ts_est = [f.t for f in traj.frames[:n]]
-        rpe = compute_rpe(Rs_est, ts_est, [np.eye(3)]*n, [p.reshape(3,1) for p in gt_pos[:n]])
-        print_metrics(ate, rpe, seq="EuRoC")
-    else:
-        print("No GT available")
-
-    _save_all_diagnostics(vo, traj, "euroc", None, first_frames, out_dir)
-    return ate, rpe, traj
-
-
 def main():
     parser = argparse.ArgumentParser(description="Monocular VO Pipeline")
     parser.add_argument("--test",    action="store_true", help="Run synthetic smoke-test")
-    parser.add_argument("--dataset", choices=["kitti", "euroc"], default="kitti")
     parser.add_argument("--root",    type=str, default="")
     parser.add_argument("--seq",     type=str, default="00", help="KITTI sequence id")
     parser.add_argument("--detector",choices=["harris", "fast"], default="harris")
@@ -236,10 +198,8 @@ def main():
 
     if args.test:
         run_synthetic_test(out_dir=args.out_dir)
-    elif args.dataset == "kitti":
+    else:
         run_kitti(args.root, args.seq, args.detector, args.max_frames, out_dir=args.out_dir)
-    elif args.dataset == "euroc":
-        run_euroc(args.root, args.detector, args.max_frames, out_dir=args.out_dir)
 
 
 if __name__ == "__main__":

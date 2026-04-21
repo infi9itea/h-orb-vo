@@ -103,7 +103,7 @@ class MonocularVO:
         else:
             scale = 1.0
 
-        self._t = self._t + scale * (self._R @ t_rel)
+        self._t = self._t + scale * (self._R @ -t_rel)
         self._R = R_rel @ self._R           
 
         # Re-detect on inlier set

@@ -6,21 +6,19 @@ from typing import Optional
 
 @dataclass
 class TrackerConfig:
-    detector: str = "harris"    
+    detector: str = "harris"
     harris_block_size: int = 2
     harris_ksize: int = 3
     harris_k: float = 0.04
-    harris_threshold: float = 0.01    
-    harris_min_distance: int = 10 
+    harris_threshold: float = 0.01
+    harris_min_distance: int = 10
     fast_threshold: int = 20
     orb_n_features: int = 500
     orb_scale_factor: float = 1.2
     orb_n_levels: int = 8
     max_features: int = 500
-    lk_win_size: tuple = (21, 21)
-    lk_max_level: int = 3
-    lk_criteria: tuple = (cv2.TERM_CRITERIA_EPS | cv2.TERM_CRITERIA_COUNT, 30, 0.01)
-    min_tracked: int = 50    
+    ratio_thresh: float = 0.75 
+    min_tracked: int = 50
 
 
 class FeatureTracker:
@@ -32,6 +30,9 @@ class FeatureTracker:
             scaleFactor=cfg.orb_scale_factor,
             nlevels=cfg.orb_n_levels,
         )
+        self.matcher = cv2.BFMatcher(cv2.NORM_HAMMING, crossCheck=False)
+
+
 
     def detect(self, gray: np.ndarray) -> np.ndarray:
         if self.cfg.detector == "harris":
@@ -83,44 +84,63 @@ class FeatureTracker:
         pts = np.array([[k.pt[0], k.pt[1]] for k in kps], dtype=np.float32)
         return pts
 
-    def describe(self, gray: np.ndarray, pts: np.ndarray):
-        
-        if len(pts) == 0:
-            return [], None
-        kps = [cv2.KeyPoint(float(p[0]), float(p[1]), 7) for p in pts]
-        kps, descs = self.orb.compute(gray, kps)
-        return kps, descs
 
-    def track(
+
+    def describe(self, gray: np.ndarray, pts: np.ndarray):
+
+        if len(pts) == 0:
+            return [], None, np.empty((0, 2), dtype=np.float32)
+
+        kps_in = [cv2.KeyPoint(float(p[0]), float(p[1]), 7) for p in pts]
+        kps_out, descs = self.orb.compute(gray, kps_in)
+
+        if not kps_out or descs is None:
+            return [], None, np.empty((0, 2), dtype=np.float32)
+
+        pts_out = np.array([[k.pt[0], k.pt[1]] for k in kps_out], dtype=np.float32)
+        return kps_out, descs, pts_out
+
+
+
+    def match(
         self,
         gray_prev: np.ndarray,
         gray_curr: np.ndarray,
         pts_prev: np.ndarray,
-    ) -> tuple[np.ndarray, np.ndarray, np.ndarray]:
+        descs_prev: Optional[np.ndarray] = None,
+    ) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
 
-        if len(pts_prev) == 0:
+        if descs_prev is None or len(descs_prev) == 0:
+            _, descs_prev, pts_prev = self.describe(gray_prev, pts_prev)
+            if descs_prev is None:
+                empty = np.empty((0, 2), dtype=np.float32)
+                return empty, empty, None, empty
+
+        pts_curr_all = self.detect(gray_curr)
+        _, descs_curr, pts_curr_all = self.describe(gray_curr, pts_curr_all)
+
+        if descs_curr is None or len(descs_curr) == 0:
             empty = np.empty((0, 2), dtype=np.float32)
-            return empty, empty, np.zeros(0, dtype=bool)
+            return empty, empty, descs_curr, empty
 
-        p0 = pts_prev.reshape(-1, 1, 2).astype(np.float32)
-        p1, st, _ = cv2.calcOpticalFlowPyrLK(
-            gray_prev, gray_curr, p0, None,
-            winSize=self.cfg.lk_win_size,
-            maxLevel=self.cfg.lk_max_level,
-            criteria=self.cfg.lk_criteria,
-        )
-        # Back-track for consistency check
-        p0r, st_back, _ = cv2.calcOpticalFlowPyrLK(
-            gray_curr, gray_prev, p1, None,
-            winSize=self.cfg.lk_win_size,
-            maxLevel=self.cfg.lk_max_level,
-            criteria=self.cfg.lk_criteria,
-        )
-        fb_err = np.linalg.norm(p0r.reshape(-1, 2) - p0.reshape(-1, 2), axis=1)
+        raw = self.matcher.knnMatch(descs_prev, descs_curr, k=2)
 
-        good = (st.ravel() == 1) & (st_back.ravel() == 1) & (fb_err < 2.0)
+        good_prev, good_curr = [], []
+        for pair in raw:
+            if len(pair) < 2:
+                continue
+            m, n = pair
+            if m.distance < self.cfg.ratio_thresh * n.distance:
+                good_prev.append(pts_prev[m.queryIdx])
+                good_curr.append(pts_curr_all[m.trainIdx])
+
+        if not good_prev:
+            empty = np.empty((0, 2), dtype=np.float32)
+            return empty, empty, descs_curr, pts_curr_all
+
         return (
-            pts_prev[good],
-            p1.reshape(-1, 2)[good],
-            good,
+            np.array(good_prev, dtype=np.float32),
+            np.array(good_curr, dtype=np.float32),
+            descs_curr,
+            pts_curr_all,
         )

@@ -28,6 +28,7 @@ class MonocularVO:
 
         self._prev_gray: Optional[np.ndarray] = None
         self._prev_pts: Optional[np.ndarray] = None
+        self._prev_descs: Optional[np.ndarray] = None  
         self._frame_idx: int = 0
 
         self._R = np.eye(3)
@@ -36,8 +37,22 @@ class MonocularVO:
 
         self.inlier_counts: list = []
         self.match_counts: list = []
-
         self.stats = []
+
+
+    def _detect_and_describe(self, gray: np.ndarray):
+        pts = self.tracker.detect(gray)
+        _, descs, pts = self.tracker.describe(gray, pts)
+        return pts, descs
+
+    def _redetect(self, gray: np.ndarray, gt_pos):
+        pts, descs = self._detect_and_describe(gray)
+        self._prev_gray = gray
+        self._prev_pts = pts
+        self._prev_descs = descs
+        self._prev_gt_pos = gt_pos
+
+
 
     def process_frame(self, img: np.ndarray, gt_pose=None) -> dict:
         gray = img if img.ndim == 2 else cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
@@ -45,41 +60,41 @@ class MonocularVO:
         gt_pos = None
         if gt_pose is not None:
             arr = np.array(gt_pose)
-            if arr.shape == (4, 4):
-                gt_pos = arr[:3, 3]
-            else:
-                gt_pos = arr.ravel()[:3]
+            gt_pos = arr[:3, 3] if arr.shape == (4, 4) else arr.ravel()[:3]
 
         if self._prev_gray is None:
+            self._prev_pts, self._prev_descs = self._detect_and_describe(gray)
             self._prev_gray = gray
-            self._prev_pts = self.tracker.detect(gray)
             self._prev_gt_pos = gt_pos
             frame = Frame(0, self._R.copy(), self._t.copy(), 0, len(self._prev_pts))
             self.trajectory.add(frame, gt_pos)
             self.inlier_counts.append(0)
             self.match_counts.append(len(self._prev_pts))
             self._frame_idx = 1
-            return {"R": self._R, "t": self._t, "n_features": len(self._prev_pts),
+            return {"R": self._R, "t": self._t,
+                    "n_features": len(self._prev_pts),
                     "n_inliers": 0, "success": True, "frame": 0}
 
-        pts_prev_ok, pts_curr_ok, _ = self.tracker.track(
-            self._prev_gray, gray, self._prev_pts)
-        n_tracked = len(pts_prev_ok)
-        self.match_counts.append(n_tracked)
+        pts_prev_ok, pts_curr_ok, descs_curr, pts_curr_all = self.tracker.match(
+            self._prev_gray, gray,
+            self._prev_pts, self._prev_descs,
+        )
+        n_matched = len(pts_prev_ok)
+        self.match_counts.append(n_matched)
 
-        if n_tracked < self.cfg.tracker.min_tracked:
-            new_pts = self.tracker.detect(gray)
-            self._prev_gray = gray
-            self._prev_pts = new_pts
-            self._prev_gt_pos = gt_pos
-            frame = Frame(self._frame_idx, self._R.copy(), self._t.copy(), 0, len(new_pts))
+        if n_matched < self.cfg.tracker.min_tracked:
+            self._redetect(gray, gt_pos)
+            frame = Frame(self._frame_idx, self._R.copy(), self._t.copy(),
+                          0, len(self._prev_pts))
             self.trajectory.add(frame, gt_pos)
             self.inlier_counts.append(0)
             self._frame_idx += 1
             if self.cfg.verbose:
-                print(f"[{self._frame_idx}] Re-detected ({n_tracked} tracks)")
-            return {"R": self._R, "t": self._t, "n_features": len(new_pts),
-                    "n_inliers": 0, "success": False, "frame": self._frame_idx - 1}
+                print(f"[{self._frame_idx}] Re-detected ({n_matched} matches)")
+            return {"R": self._R, "t": self._t,
+                    "n_features": len(self._prev_pts),
+                    "n_inliers": 0, "success": False,
+                    "frame": self._frame_idx - 1}
 
         success, R_rel, t_rel, inlier_mask = self.estimator.recover_pose(
             pts_prev_ok, pts_curr_ok)
@@ -89,14 +104,15 @@ class MonocularVO:
         if not success:
             if self.cfg.verbose:
                 print(f"[{self._frame_idx}] Pose estimation failed")
-            self._prev_gray = gray
-            self._prev_pts = self.tracker.detect(gray)
-            self._prev_gt_pos = gt_pos
-            frame = Frame(self._frame_idx, self._R.copy(), self._t.copy(), 0, n_tracked)
+            self._redetect(gray, gt_pos)
+            frame = Frame(self._frame_idx, self._R.copy(), self._t.copy(),
+                          0, n_matched)
             self.trajectory.add(frame, gt_pos)
             self._frame_idx += 1
-            return {"R": self._R, "t": self._t, "n_features": n_tracked,
-                    "n_inliers": 0, "success": False, "frame": self._frame_idx - 1}
+            return {"R": self._R, "t": self._t,
+                    "n_features": n_matched,
+                    "n_inliers": 0, "success": False,
+                    "frame": self._frame_idx - 1}
 
         if self.cfg.use_gt_scale and gt_pos is not None and self._prev_gt_pos is not None:
             scale = recover_scale_from_gt(t_rel, self._prev_gt_pos, gt_pos)
@@ -104,30 +120,31 @@ class MonocularVO:
             scale = 1.0
 
         self._t = self._t + scale * (self._R @ -t_rel)
-        self._R = R_rel @ self._R           
+        self._R = R_rel @ self._R
 
-        # Re-detect on inlier set
-        inlier_flat = inlier_mask.ravel().astype(bool)
-        new_tracked = pts_curr_ok[inlier_flat]
-        if len(new_tracked) < self.cfg.tracker.min_tracked:
-            new_tracked = self.tracker.detect(gray)
 
         self._prev_gray = gray
-        self._prev_pts = new_tracked
+        self._prev_pts = pts_curr_all if pts_curr_all is not None and len(pts_curr_all) >= self.cfg.tracker.min_tracked \
+                         else self.tracker.detect(gray)
+        if len(self._prev_pts) != (len(pts_curr_all) if pts_curr_all is not None else 0):
+            _, self._prev_descs, self._prev_pts = self.tracker.describe(gray, self._prev_pts)
+        else:
+            self._prev_descs = descs_curr
         self._prev_gt_pos = gt_pos
 
-        frame = Frame(self._frame_idx, self._R.copy(), self._t.copy(), n_inliers, n_tracked)
+        frame = Frame(self._frame_idx, self._R.copy(), self._t.copy(),
+                      n_inliers, n_matched)
         self.trajectory.add(frame, gt_pos)
 
         stat = {"frame": self._frame_idx, "R": self._R.copy(), "t": self._t.copy(),
-                "n_features": n_tracked, "n_inliers": n_inliers,
+                "n_features": n_matched, "n_inliers": n_inliers,
                 "scale": scale, "success": True}
         self.stats.append(stat)
         self._frame_idx += 1
 
         if self.cfg.verbose and self._frame_idx % 50 == 0:
             print(f"[{self._frame_idx}] t={self._t.ravel()}, "
-                  f"inliers={n_inliers}/{n_tracked}, scale={scale:.3f}")
+                  f"inliers={n_inliers}/{n_matched}, scale={scale:.3f}")
 
         return stat
 
